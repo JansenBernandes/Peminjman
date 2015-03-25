@@ -1,0 +1,129 @@
+<?php
+class Barang extends CI_Controller{
+    private $limit=20;
+    
+    function __construct(){
+        parent::__construct();
+        $this->load->library(array('template','form_validation','pagination','upload'));
+        $this->load->model('m_barang');
+		$this->load->model('m_peminjaman');
+        
+        if(!$this->session->userdata('username')){
+            redirect('web');
+        }
+    }
+    
+    function index($offset=0,$order_column='id_barang',$order_type='asc'){
+        if(empty($offset)) $offset=0;
+        if(empty($order_column)) $order_column='id_barang';
+        if(empty($order_type)) $order_type='asc';
+        
+        //load data
+        $data['barang']=$this->m_barang->semua($this->limit,$offset,$order_column,$order_type)->result();
+        $data['title']="Data Barang";
+        
+        $config['base_url']=site_url('barang/index/');
+        $config['total_rows']=$this->m_barang->jumlah();
+        $config['per_page']=$this->limit;
+        $config['uri_segment']=3;
+        $this->pagination->initialize($config);
+        $data['pagination']=$this->pagination->create_links();
+        
+        
+        if($this->uri->segment(3)=="delete_success")
+            $data['message']="<div class='alert alert-success'>Data berhasil dihapus</div>";
+        else if($this->uri->segment(3)=="add_success")
+            $data['message']="<div class='alert alert-success'>Data Berhasil disimpan</div>";
+        else
+            $data['message']='';
+            $this->template->display('barang/index',$data);
+    }
+    
+    
+    function tambah(){
+        $data['title']="Tambah Barang";
+        $this->_set_rules();
+        if($this->form_validation->run()==true){//jika validasi dijalankan dan benar
+            $id_barang=$this->input->post('id_barang'); // mendapatkan input dari id
+            $cek=$this->m_barang->cek($id_barang); // cek id di database
+            if($cek->num_rows()>0){ // jika id sudah ada, maka tampilkan pesan
+                $data['message']="<div class='alert alert-danger'>ID Barang sudah ada</div>";
+                $this->template->display('barang/tambah',$data);// menampilkan lagi view tambah
+            }else{ // jika id barang belum ada, maka simpan
+                
+                $info=array(
+                    'id_barang'=>$this->input->post('id_barang'),
+                    'nama_barang'=>$this->input->post('nama_barang'),
+                    'serial_number'=>$this->input->post('serial_number'),
+                   	'status'=>$this->input->post('status')
+                );
+                $this->m_barang->simpan($info);
+                redirect('barang/index/add_success');
+
+            }
+        }else{
+            $data['message']="";
+            $this->template->display('barang/tambah',$data);
+        }
+    }
+    
+    function edit($id_barang){
+        $data['title']="Edit data Barang";
+        $this->_set_rules();
+        if($this->form_validation->run()==true){
+            $id_barang=$this->input->post('id_barang');
+            
+            	$info=array(
+                	'nama_barang'=>$this->input->post('nama_barang'),
+	                'serial_number'=>$this->input->post('serial_number'),
+    	            'status'=>$this->input->post('status')
+        		    );
+            $this->m_barang->update($id_barang,$info);
+            
+            $data['barang']=$this->m_barang->cek($id_barang)->row_array();
+            $data['message']="<div class='alert alert-success'>Data berhasil diupdate</div>";
+            $this->template->display('barang/edit',$data);
+        }else{
+            $data['message']="";
+            $data['barang']=$this->m_barang->cek($id_barang)->row_array();
+            $this->template->display('barang/edit',$data);
+			         
+        }
+    }           
+    
+    function hapus(){
+        $id_barang=$this->input->post('id_barang');
+        $detail=$this->m_barang->cek($id_barang)->result();
+	foreach($detail as $det):
+	    unlink("assets/img/".$det->image);
+	endforeach;
+        $this->m_barang->hapus($id_barang);
+    }
+    
+    function cari(){
+        $data['title']="Pencarian";
+        $cari=$this->input->post('cari');
+        $cek=$this->m_barang->cari($cari);
+        if($cek->num_rows()>0){
+            $data['message']="";
+            $data['barang']=$cek->result();
+            $this->template->display('barang/cari',$data);
+        }else{
+            $data['message']="<div class='alert alert-success'>Data tidak ditemukan</div>";
+            $data['barang']=$cek->result();
+            $this->template->display('barang/cari',$data);
+        }
+    }
+
+   	function excel(){
+		$this->load->view("barang/barang_excel_v");
+	}
+    
+    function _set_rules(){
+        $this->form_validation->set_rules('id_barang','ID Barang','required|max_length[10]');
+        $this->form_validation->set_rules('nama_barang','Nama Barang','required|max_length[100]');
+        $this->form_validation->set_rules('serial_number','Serial Number','required|max_length[50]');
+       // $this->form_validation->set_rules('klasifikasi','Status','required|max_length[25]');
+        $this->form_validation->set_error_delimiters("<div class='alert alert-danger'>","</div>");
+    }
+}
