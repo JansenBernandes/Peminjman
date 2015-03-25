@@ -1,0 +1,106 @@
+<?php
+class Peminjaman extends CI_Controller{
+    
+    function __construct(){
+        parent::__construct();
+        $this->load->library(array('form_validation','template'));
+        $this->load->model('m_peminjaman');
+		$this->load->model('m_barang');
+        
+        if(!$this->session->userdata('username')){
+            redirect('web');
+        }
+    }
+    
+    function index(){
+        $data['title']="Transaksi Peminjaman";
+        $data['tanggalpinjam']=date('Y-m-d');
+        $data['noauto']=$this->m_peminjaman->nootomatis();
+        $data['karyawan']=$this->m_peminjaman->getKaryawan()->result();
+        $data['tanggalkembali'] = date('Y-m-d');
+        $this->template->display('peminjaman/index',$data);
+    }
+    
+    function tampil(){
+        $data['tmp']=$this->m_peminjaman->tampilTmp()->result();
+        $data['jumlahTmp']=$this->m_peminjaman->jumlahTmp();
+        $this->load->view('peminjaman/tampil',$data);
+    }
+    
+    function sukses(){
+        
+        $tmp=$this->m_peminjaman->tampilTmp()->result();
+        foreach($tmp as $row){
+            $info=array(
+                'id_transaksi'=>$this->input->post('nomer'),
+                'nik'=>$this->input->post('nik'),
+                'id_barang'=>$row->id_barang,
+                'tanggal_pinjam'=>$this->input->post('pinjam'),
+                'tanggal_kembali'=>$this->input->post('kembali'),
+                'status'=>'pinjam'
+            );
+            $this->m_peminjaman->simpan($info);
+    	
+		    //hapus data di temp
+            $this->m_peminjaman->hapusTmp($row->id_barang);
+        }
+    }
+    
+    function cariKaryawan(){
+        $nik=$this->input->post('nik');
+        $karyawan=$this->m_peminjaman->cariKaryawan($nik);
+        if($karyawan->num_rows()>0){
+            $karyawan=$karyawan->row_array();
+            echo $karyawan['nama'];
+        }
+    }
+    
+    function cariBarang(){
+        $id_barang=$this->input->post('id_barang');
+        $barang=$this->m_peminjaman->cariBarang($id_barang);
+        if($barang->num_rows()>0){
+            $barang=$barang->row_array();
+            echo $barang['nama_barang']."|".$barang['serial_number']."|".$barang['status'];
+        }
+    }
+    
+    
+    function tambah(){
+        $id_barang=$this->input->post('id_barang');
+        $cek=$this->m_peminjaman->cekTmp($id_barang);
+        if($cek->num_rows()<1){
+            $info=array(
+                'id_barang'=>$this->input->post('id_barang'),
+                'nama_barang'=>$this->input->post('nama_barang'),
+                'serial_number'=>$this->input->post('serial_number'),
+                'status'=>'pinjam'
+            );
+            $this->m_peminjaman->simpanTmp($info);    			
+		}
+		//update status peminjaman dari tersedia menjadi tidak
+       	$id_barang=$this->input->post('id_barang');
+       	$update=array(
+       		'status'=>"pinjam"
+        	);
+        $this->m_barang->updateStatus($id_barang,$update);
+	
+    }
+    
+    function hapus(){
+        $id_barang=$this->input->post('id_barang');
+        $this->m_peminjaman->hapusTmp($id_barang);
+		//update status peminjaman dari tersedia menjadi tidak
+        $id_barang=$this->input->post('id_barang');
+        $update=array(
+            'status'=>"tersedia"
+        );
+        $this->m_barang->updateStatus($id_barang,$update);
+	
+    }
+    
+    function pencarianbarang(){
+        $cari=$this->input->post('caribarang');
+        $data['barang']=$this->m_peminjaman->pencarianbarang($cari)->result();
+        $this->load->view('peminjaman/pencarianbarang',$data);
+    }	
+}
